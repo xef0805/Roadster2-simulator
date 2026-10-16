@@ -42,6 +42,9 @@ var test_controls: Dictionary = {}
 var wheel_visuals: Array[Node3D] = []
 var cabin: Node3D
 var driver: Dictionary = {}
+var cockpit_mirror: Node3D
+var mirror_view: SubViewport
+var mirror_camera: Camera3D
 var jet_nodes: Array[GPUParticles3D] = []
 var jet_cores: Array[MeshInstance3D] = []
 var roll_jet_nodes: Array[GPUParticles3D] = []
@@ -99,6 +102,7 @@ func _ready() -> void:
 		wheel_visuals = visual.wheels
 		cabin = visual.cabin
 		driver = visual.driver
+		_make_cockpit_mirror()
 		_make_effects()
 		var lamp := SpotLight3D.new()
 		lamp.position = Vector3(0,0.22,-2.25)
@@ -351,7 +355,7 @@ func _process(delta: float) -> void:
 	if not visual_enabled:
 		return
 	if not driver.is_empty():
-		driver.head.visible = not cockpit_audio
+		driver.head.visible = true
 		var turn := Basis(Vector3(0,cos(PI/2.5),sin(PI/2.5)),-float(controls.steer)*0.55)
 		driver.wheel.basis = turn
 		for i in range(2):
@@ -360,7 +364,13 @@ func _process(delta: float) -> void:
 			var elbow: Vector3 = driver.elbows[i]
 			var arm: MeshInstance3D = driver.forearms[i]
 			(arm.mesh as BoxMesh).size.z = elbow.distance_to(hand)
-			arm.look_at_from_position((elbow+hand)*0.5,hand,Vector3.UP)
+			arm.position = (elbow+hand)*0.5
+			arm.basis = Basis.looking_at(hand-elbow,Vector3.UP)
+	cockpit_mirror.visible = cockpit_audio
+	mirror_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS if cockpit_audio else SubViewport.UPDATE_DISABLED
+	if cockpit_audio:
+		mirror_camera.position = global_transform*Vector3(0,0.80,-0.56)
+		mirror_camera.look_at(global_transform*Vector3(-0.37,0.65,0.49),global_basis.y)
 	for i in range(wheel_visuals.size()):
 		wheel_visuals[i].position.y = 0.15-float(wheel_lengths[i])
 		wheel_visuals[i].rotation.y = -float(controls.steer)*0.4 if i<2 else 0.0
@@ -491,6 +501,44 @@ func _particle(amount: int, lifetime: float, size: float, color: Color) -> GPUPa
 	node.draw_pass_1 = quad
 	return node
 
+func _make_cockpit_mirror() -> void:
+	cockpit_mirror = Node3D.new()
+	cockpit_mirror.name = "CockpitMirror"
+	add_child(cockpit_mirror)
+	cockpit_mirror.position = Vector3(0,0.80,-0.56)
+	var frame := Art.box(cockpit_mirror,Vector3(0.44,0.14,0.035),Vector3.ZERO,Art.mat(Color("0b1017"),0.45,0.22))
+	frame.layers = 4
+	var stem := Art.box(cockpit_mirror,Vector3(0.022,0.075,0.02),Vector3(0,0.09,0),Art.mat(Color("18212a")))
+	stem.layers = 4
+	mirror_view = SubViewport.new()
+	mirror_view.size = Vector2i(512,160)
+	mirror_view.world_3d = get_world_3d()
+	mirror_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(mirror_view)
+	mirror_camera = Camera3D.new()
+	mirror_camera.fov = 24
+	mirror_camera.near = 0.03
+	mirror_camera.cull_mask = 3
+	mirror_view.add_child(mirror_camera)
+	var surface := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.405,0.108)
+	surface.mesh = quad
+	surface.position.z = 0.02
+	surface.layers = 4
+	var shader := Shader.new()
+	shader.code = """shader_type spatial;
+render_mode unshaded, cull_disabled;
+uniform sampler2D reflection : source_color;
+void fragment() { ALBEDO = texture(reflection, vec2(1.0-UV.x, UV.y)).rgb; }
+"""
+	var reflection := ShaderMaterial.new()
+	reflection.shader = shader
+	reflection.set_shader_parameter("reflection",mirror_view.get_texture())
+	surface.material_override = reflection
+	cockpit_mirror.add_child(surface)
+	cockpit_mirror.hide()
+
 func _make_effects() -> void:
 	# A radial texture keeps exhaust clouds soft rather than square billboards.
 	var image := Image.create(64,64,false,Image.FORMAT_RGBA8)
@@ -534,7 +582,7 @@ void fragment() {
 		jet.add_child(core)
 		jet_cores.append(core)
 	for p in ROLL_MOUNTS:
-		var nozzle := Art.box(self,Vector3(0.05,0.09,0.17),p,Art.mat(Color("18222a"),0.8,0.3))
+		var nozzle := Art.box(self,Vector3(0.028,0.045,0.12),p,Art.mat(Color("18222a"),0.8,0.3))
 		nozzle.name = "RollNozzle"
 		var jet := _particle(72,0.18,0.4,Color(0.5,0.82,1.0,0.3))
 		jet.fixed_fps = 120

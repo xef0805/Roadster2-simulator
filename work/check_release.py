@@ -13,7 +13,7 @@ for key, name in [("APPDATA", "release-data"), ("LOCALAPPDATA", "release-cache")
     folder = work / name
     folder.mkdir(exist_ok=True)
     env[key] = str(folder)
-for mode in ["current", "perf", "small"]:
+for mode in ["current", "perf", "perf-cockpit", "small"]:
     log = work / f"standalone-{mode}.log"
     args = [str(exe), "--log-file", str(log)]
     if mode == "small":
@@ -33,4 +33,8 @@ assert visual["passed"]
 perf = json.loads((data / "performance.json").read_text(encoding="utf-8"))
 assert perf["render_resolution"] == "(1920.0, 1080.0)" or perf["render_resolution"] == "(1920, 1080)"
 print(json.dumps(perf), flush=True)
+cockpit_perf = json.loads((data / "performance-cockpit.json").read_text(encoding="utf-8"))
+assert cockpit_perf["render_resolution"] == "(1920, 1080)"
+assert min(perf["average_fps"], cockpit_perf["average_fps"]) > 60
+print("Cockpit", json.dumps(cockpit_perf), flush=True)
 print("Standalone checks passed", flush=True)

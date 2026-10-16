@@ -46,13 +46,16 @@ static func mesh_from_faces(parent: Node3D, vertices: Array, faces: Array, mater
 static func car(parent: Node3D, color: Color, detailed := false) -> Dictionary:
 	var paint := mat(color,0.48,0.22)
 	paint.cull_mode = BaseMaterial3D.CULL_DISABLED
+	paint.disable_receive_shadows = true
 	var dark := mat(Color("10151b"),0.35,0.32)
 	var glass := mat(Color("07131c"),0.68,0.14)
 	glass.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var side_glass := mat(Color("211f23"),0.38,0.20)
+	side_glass.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var white := mat(Color("dcf4ff"),0.1,0.2,1.5)
 	var red := mat(Color("ff1738"),0.1,0.3,1.8)
-	# Rounded shoulders and real arch openings keep the coupe silhouette readable.
-	var sections := [[-2.30,0.77,0.055],[-2.08,0.91,0.12],[-1.55,1.03,0.23],[-0.85,1.01,0.26],[0.10,1.00,0.27],[0.85,1.065,0.31],[1.45,1.065,0.34],[2.05,0.99,0.29],[2.20,0.89,0.22]]
+	# The reference has a broad wedge nose, raised shoulders and a high rear deck.
+	var sections := [[-2.30,0.84,0.085],[-2.05,0.97,0.16],[-1.48,1.055,0.245],[-0.88,1.015,0.28],[0.25,1.00,0.30],[0.95,1.05,0.345],[1.48,1.06,0.37],[2.20,0.94,0.365]]
 	var vertices: Array = []
 	var faces: Array = []
 	var count := 92
@@ -65,67 +68,87 @@ static func car(parent: Node3D, color: Color, detailed := false) -> Dictionary:
 		var t := smoothstep(float(a[0]),float(b[0]),z)
 		var width := lerpf(float(a[1]),float(b[1]),t)
 		var top := lerpf(float(a[2]),float(b[2]),t)
+		var center_top := lerpf(0.085,0.30,clampf((z+2.30)/1.42,0,1)) if z< -0.88 else top
 		var lower := -0.16
 		for axle in [-1.48,1.48]:
 			var dz: float = z-axle
 			if absf(dz)<0.40: lower = maxf(lower,-0.25+sqrt(0.40*0.40-dz*dz))
-		vertices.append_array([Vector3(-width,lower,z),Vector3(width,lower,z),Vector3(width,top-0.08,z),Vector3(width*0.86,top,z),Vector3(width*0.55,top+0.012,z),Vector3(-width*0.55,top+0.012,z),Vector3(-width*0.86,top,z),Vector3(-width,top-0.08,z)])
+		var shoulder := maxf(top-0.055,lower+0.025)
+		vertices.append_array([Vector3(-width,lower,z),Vector3(width,lower,z),Vector3(width,shoulder,z),Vector3(width*0.86,top,z),Vector3(width*0.55,center_top,z),Vector3(-width*0.55,center_top,z),Vector3(-width*0.86,top,z),Vector3(-width,shoulder,z)])
 		if i>0:
-			for j in range(8): faces.append([(i-1)*8+j,(i-1)*8+(j+1)%8,i*8+(j+1)%8,i*8+j])
+			for j in range(8):
+				if j==4 and z> -0.72 and z<1.14: continue
+				faces.append([(i-1)*8+j,(i-1)*8+(j+1)%8,i*8+(j+1)%8,i*8+j])
 	faces.append([7,6,5,4,3,2,1,0])
 	var end := count*8
 	faces.append([end,end+1,end+2,end+3,end+4,end+5,end+6,end+7])
-	var body := mesh_from_faces(parent,vertices,faces,paint,true)
+	var body_surface := SurfaceTool.new()
+	body_surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for face in faces:
+		var side: int = int(face[0])%8
+		# Keep flat door panels separate from the curved hood and arch lips.
+		body_surface.set_smooth_group((side if side in [0,1,7] else 2) if face.size()==4 else -1)
+		for j in range(1,face.size()-1):
+			for k in [0,j,j+1]: body_surface.add_vertex(vertices[face[k]])
+	body_surface.generate_normals()
+	var body := MeshInstance3D.new()
+	body.mesh = body_surface.commit()
+	body.material_override = paint
+	parent.add_child(body)
 	body.name = "RoadsterBody"
-	box(parent,Vector3(1.58,0.07,0.09),Vector3(0,-0.08,-2.27),dark)
+	box(parent,Vector3(1.69,0.165,0.085),Vector3(0,-0.04,-2.31),dark)
+	beam(parent,Vector3(-0.83,0.071,-2.345),Vector3(0,0.065,-2.348),0.014,white)
+	beam(parent,Vector3(0,0.065,-2.348),Vector3(0.83,0.071,-2.345),0.014,white)
+	box(parent,Vector3(1.82,0.025,0.17),Vector3(0,-0.14,-2.27),dark)
 	box(parent,Vector3(1.70,0.10,0.11),Vector3(0,-0.06,2.18),dark)
 	for side in [-1.0,1.0]:
-		# Two slim, swept front lamps rather than a rectangular full-width bar.
-		beam(parent,Vector3(side*0.55,0.105,-2.17),Vector3(side*0.88,0.125,-1.98),0.035,dark)
-		beam(parent,Vector3(side*0.56,0.12,-2.17),Vector3(side*0.86,0.14,-1.98),0.022,white)
-		beam(parent,Vector3(side*1.005,-0.115,-0.92),Vector3(side*1.05,-0.10,0.93),0.055,dark)
-		box(parent,Vector3(0.035,0.022,0.17),Vector3(side*1.015,0.215,0.18),dark)
-		box(parent,Vector3(0.035,0.11,0.38),Vector3(side*1.065,0.04,0.95),dark)
-		beam(parent,Vector3(side*0.78,0.35,-0.56),Vector3(side*1.06,0.36,-0.42),0.035,dark)
-		var mirror := box(parent,Vector3(0.18,0.07,0.18),Vector3(side*1.06,0.38,-0.43),paint)
+		mesh_from_faces(parent,[Vector3(side*1.01,-0.13,-0.94),Vector3(side*1.025,0.01,-0.78),Vector3(side*1.04,0.10,0.94),Vector3(side*1.04,-0.12,0.98)],[[0,1,2,3]],dark)
+		box(parent,Vector3(0.018,0.018,0.15),Vector3(side*1.008,0.29,0.15),dark)
+		beam(parent,Vector3(side*0.79,0.36,-0.65),Vector3(side*1.035,0.37,-0.56),0.02,dark)
+		var mirror := box(parent,Vector3(0.14,0.045,0.16),Vector3(side*1.035,0.38,-0.56),paint)
 		mirror.rotation.y = side*0.22
 	# Narrow red rear ribbon wraps into the rear shoulders.
 	for i in range(20):
 		var x0 := lerpf(-0.88,0.88,float(i)/20)
 		var x1 := lerpf(-0.88,0.88,float(i+1)/20)
-		beam(parent,Vector3(x0,0.25,2.215-0.08*pow(x0/0.88,2)),Vector3(x1,0.25,2.215-0.08*pow(x1/0.88,2)),0.027,red)
+		beam(parent,Vector3(x0,0.35,2.215-0.08*pow(x0/0.88,2)),Vector3(x1,0.35,2.215-0.08*pow(x1/0.88,2)),0.023,red)
 	for x in [-0.64,-0.32,0.0,0.32,0.64]:
 		box(parent,Vector3(0.025,0.10,0.30),Vector3(x,-0.095,2.09),dark)
-	box(parent,Vector3(1.61,0.025,0.15),Vector3(0,0.31,1.99),dark)
+	box(parent,Vector3(1.61,0.022,0.10),Vector3(0,0.402,2.10),dark)
 	var cabin := Node3D.new()
 	cabin.name = "RoadsterGlassCanopy"
 	parent.add_child(cabin)
-	var canopy_sections := [[-0.96,0.79,0.28,0.285],[-0.73,0.75,0.28,0.47],[-0.46,0.70,0.29,0.68],[-0.20,0.66,0.29,0.79],[0.18,0.66,0.30,0.82],[0.48,0.69,0.31,0.78],[0.78,0.74,0.32,0.62],[1.04,0.79,0.33,0.43],[1.26,0.81,0.34,0.345]]
+	var canopy_sections := [[-1.02,0.81,0.30,0.005],[-0.82,0.775,0.42,0.025],[-0.58,0.73,0.59,0.035],[-0.25,0.66,0.75,0.055],[0.15,0.67,0.78,0.055],[0.65,0.70,0.76,0.045],[0.96,0.77,0.53,0.02],[1.35,0.86,0.37,0.005]]
 	var canopy_vertices: Array = []
 	var canopy_faces: Array = []
 	for i in range(45):
-		var z := lerpf(-0.96,1.26,i/44.0)
+		var z := lerpf(-1.02,1.35,i/44.0)
 		var section := 0
 		while section<canopy_sections.size()-2 and z>canopy_sections[section+1][0]: section+=1
 		var a: Array = canopy_sections[section]
 		var b: Array = canopy_sections[section+1]
 		var t := inverse_lerp(float(a[0]),float(b[0]),z)
 		var width := lerpf(a[1],b[1],t)
-		var belt := lerpf(a[2],b[2],t)
-		var top := lerpf(a[3],b[3],t)
+		var edge := lerpf(a[2],b[2],t)
+		var crown := lerpf(a[3],b[3],t)
 		for j in range(19):
 			var u := lerpf(-1,1,j/18.0)
-			var y := belt+(top-belt)*sqrt(maxf(0,1.0-pow(absf(u),6.0)))
+			var y := edge+crown*(1.0-u*u)
 			canopy_vertices.append(Vector3(u*width,y,z))
 			if i>0 and j>0: canopy_faces.append([(i-1)*19+j-1,(i-1)*19+j,i*19+j,i*19+j-1])
 	mesh_from_faces(cabin,canopy_vertices,canopy_faces,glass,true)
 	for side in [-1.0,1.0]:
-		beam(cabin,Vector3(side*0.79,0.28,-0.93),Vector3(side*0.55,0.71,-0.20),0.025,paint)
-		beam(cabin,Vector3(side*0.56,0.69,0.48),Vector3(side*0.81,0.34,1.24),0.06,paint)
-		beam(parent,Vector3(side*0.79,0.28,-0.93),Vector3(side*0.81,0.34,1.24),0.022,paint)
+		var pane := mesh_from_faces(cabin,[Vector3(side*0.81,0.30,-1.02),Vector3(side*0.66,0.75,-0.25),Vector3(side*0.70,0.76,0.65),Vector3(side*0.86,0.37,1.35)],[[0,1,2,3]],side_glass)
+		pane.name = "SideGlassLeft" if side<0 else "SideGlassRight"
+		pane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		beam(cabin,Vector3(side*0.81,0.30,-1.02),Vector3(side*0.66,0.75,-0.25),0.026,paint)
+		beam(cabin,Vector3(side*0.66,0.75,-0.25),Vector3(side*0.70,0.76,0.65),0.018,paint)
+		beam(cabin,Vector3(side*0.70,0.76,0.65),Vector3(side*0.86,0.37,1.35),0.065,paint)
+		beam(cabin,Vector3(side*0.695,0.762,0.53),Vector3(side*0.846,0.355,0.53),0.022,dark)
+		beam(parent,Vector3(side*0.81,0.30,-1.02),Vector3(side*0.86,0.37,1.35),0.018,paint)
 	var wheels: Array[Node3D] = []
 	var rubber := mat(Color("07090c"),0.05,0.86)
-	var alloy := mat(Color("8d99a5"),0.85,0.22)
+	var alloy := mat(Color("b9c3cb"),0.80,0.24)
 	for p in [Vector3(-0.94,-0.25,-1.48),Vector3(0.94,-0.25,-1.48),Vector3(-0.94,-0.25,1.48),Vector3(0.94,-0.25,1.48)]:
 		var wheel := Node3D.new()
 		parent.add_child(wheel)
@@ -153,10 +176,17 @@ static func car(parent: Node3D, color: Color, detailed := false) -> Dictionary:
 			wheel.add_child(rim)
 			for i in range(5):
 				var angle := TAU*i/5.0
-				beam(wheel,Vector3(side*0.145,cos(angle)*0.045,sin(angle)*0.045),Vector3(side*0.145,cos(angle+0.18)*0.215,sin(angle+0.18)*0.215),0.028,alloy)
+				var blade: Array = []
+				for point in [Vector2(0.055,angle-0.15),Vector2(0.23,angle-0.06),Vector2(0.23,angle+0.72),Vector2(0.055,angle+0.35)]:
+					blade.append(Vector3(side*0.15,cos(point.y)*point.x,sin(point.y)*point.x))
+				var aero := mesh_from_faces(wheel,blade,[[0,1,2,3]],alloy)
+				aero.material_override.cull_mode = BaseMaterial3D.CULL_DISABLED
 		wheels.append(wheel)
 	var driver := {}
 	if detailed:
+		box(parent,Vector3(1.50,0.06,2.05),Vector3(0,0.015,0.24),dark)
+		box(parent,Vector3(0.42,0.10,0.45),Vector3(0.37,0.07,0.52),dark)
+		box(parent,Vector3(0.42,0.50,0.10),Vector3(0.37,0.31,0.76),dark)
 		box(parent,Vector3(1.38,0.10,0.28),Vector3(0,0.38,-0.32),dark)
 		box(parent,Vector3(0.34,0.13,0.025),Vector3(0.06,0.47,-0.41),mat(Color("166d83"),0.2,0.3,0.5))
 		var torus := TorusMesh.new()
@@ -171,7 +201,12 @@ static func car(parent: Node3D, color: Color, detailed := false) -> Dictionary:
 		wheel_control.add_child(steering)
 		steering.rotation.x = PI/2.5
 		box(wheel_control,Vector3(0.24,0.025,0.025),Vector3.ZERO,alloy)
-		driver = robot_driver(parent,wheel_control)
+		var pilot := Node3D.new()
+		pilot.name = "OptimusDriver"
+		parent.add_child(pilot)
+		driver = robot_driver(pilot,wheel_control)
+		driver.root = pilot
+		for mesh in pilot.find_children("*","GeometryInstance3D",true,false): mesh.layers = 2
 	return {"wheels":wheels,"cabin":cabin,"driver":driver}
 
 static func robot_driver(parent: Node3D, wheel: Node3D) -> Dictionary:

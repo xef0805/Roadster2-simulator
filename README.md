@@ -2,13 +2,13 @@
 
 Windows 单机自由试驾游戏。白色 Roadster 风格跑车、夜间测试场、倒挂弧形坡道与五车飞越场景，使用 Godot 4.7.2、GDScript、Jolt 和固定 120Hz 物理。
 
-作者水印：**GitHub / 抖音 Felix_0805**。
+作者水印：**GitHub https://github.com/xef0805 / 抖音 Felix_0805**。
 
 ## 下载与运行
 
 [下载 Windows 最新版](https://github.com/xef0805/Roadster2-simulator/releases/latest/download/RoadsterLab-Windows.zip) · [下载独立 Godot 源工程](https://github.com/xef0805/Roadster2-simulator/releases/latest/download/RoadsterLab-source.zip)
 
-解压 Windows 包后双击 `RoadsterLab/RoadsterLab.exe`，默认无边框全屏，不需要安装 Godot。当前版本 **v0.1.6**。
+解压 Windows 包后双击 `RoadsterLab/RoadsterLab.exe`，默认无边框全屏，不需要安装 Godot。当前版本 **v0.1.7**。
 
 ![Roadster 车身](outputs/截图_Roadster.png)
 
@@ -27,7 +27,9 @@ Windows 单机自由试驾游戏。白色 Roadster 风格跑车、夜间测试�
 | Tab | 查看或退出最近一次起飞、空翻回放 |
 | R / Esc | 重置 / 暂停与场景选择 |
 
-起飞后自动录制，落地约 0.8 秒后保存最近一次动作，包含起飞前约 1 秒。回放中右键转向、WASD 自由移动、Q/E 升降、Shift 加速、滚轮调整镜头速度；P 暂停/播放，J/L 前后跳一秒，也可拖动进度条。回放暂停时仍能移动镜头，Tab 或 Esc 返回原驾驶位置与速度。仅保留本次运行最近一次完整动作，最长约 60 秒，不是视频导出功能。
+回放保留最多 12 秒助跑记录，进入弧形坡道后持续录制整段爬升，落地约 0.8 秒后保存。回放中右键转向、WASD 自由移动、**Q/E 降低/升高、空格暂停/播放、←/→ 前后跳一秒**，也可拖动进度条。镜头默认 32m/s，Shift 加速、滚轮调整速度。默认跟随车辆，调整镜头后进入自由观察。静置 3 秒自动隐藏操作提示、进度条和仪表，操作后重新出现；水印保持显示。暂停时仍能移动镜头，Tab 或 Esc 返回原驾驶位置与速度。仅保留本次运行最近一次完整动作，最长约 120 秒，不是视频导出功能。
+
+车身按参考图调整楔形车头、贯穿式前灯、肩线、溜背车顶和轮毂。侧窗保持不透明；机器人仅在驾驶舱内后视镜的实时画面中可见。Esc 暂停菜单采用暗色遮罩、主按钮和场景卡片布局。
 
 ![自由视角回放](outputs/截图_回放.png)
 

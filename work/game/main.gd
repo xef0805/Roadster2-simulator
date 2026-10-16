@@ -19,7 +19,7 @@ var orbit_held := false
 var camera_up := Vector3.UP
 var hud: Hud
 var hint_label: Label
-var pause_panel: PanelContainer
+var pause_panel: Control
 var elapsed := 0.0
 var perf_samples: Array[float] = []
 var qa_mode := ""
@@ -37,6 +37,7 @@ func _ready() -> void:
 	add_child(car)
 	car.position = Vector3(-42,0.65,22)
 	camera = Camera3D.new()
+	camera.cull_mask = 5
 	camera.fov = 67
 	camera.near = 0.07
 	camera.far = 700
@@ -52,7 +53,7 @@ func _ready() -> void:
 	for arg in args:
 		if arg.begins_with("--qa-"):
 			qa_mode = arg
-	if qa_mode in ["--qa-perf","--qa-v014","--qa-v015"]:
+	if qa_mode in ["--qa-perf","--qa-perf-cockpit","--qa-v014","--qa-v015"]:
 		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS,true)
 		DisplayServer.window_set_size(Vector2i(1920,1080))
 		DisplayServer.window_set_position(Vector2i.ZERO)
@@ -60,7 +61,7 @@ func _ready() -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS,false)
 		DisplayServer.window_set_size(Vector2i(1280,720))
-	if qa_mode!="--qa-perf" and not testing:
+	if qa_mode not in ["--qa-perf","--qa-perf-cockpit"] and not testing:
 		Engine.max_fps = 120
 	if not qa_mode.is_empty():
 		car.test_controls = {"throttle":0.0}
@@ -241,17 +242,20 @@ func _ui() -> void:
 	theme.default_font = font
 	root.theme = theme
 	var title := _label(root,"ROADSTER  /  FLIGHT LAB",25,Color("e0edf3"))
+	title.name = "GameTitle"
 	title.position = Vector2(38,28)
-	var subtitle := _label(root,"自由试驾原型 v0.1.6    /    夜间测试场",15,Color("7999ad"))
+	var subtitle := _label(root,"自由试驾原型 v0.1.7    /    夜间测试场",15,Color("7999ad"))
+	subtitle.name = "GameSubtitle"
 	subtitle.position = Vector2(39,64)
-	var watermark := _label(root,"GitHub / 抖音  Felix_0805",15,Color(0.75,0.87,0.94,0.68))
+	var watermark := _label(root,"GitHub · https://github.com/xef0805\n抖音 · Felix_0805",14,Color(0.75,0.87,0.94,0.74))
 	watermark.name = "CreatorWatermark"
 	watermark.anchor_left = 1.0
 	watermark.anchor_right = 1.0
-	watermark.offset_left = -295
+	watermark.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	watermark.offset_left = -440
 	watermark.offset_right = -28
 	watermark.offset_top = 28
-	watermark.offset_bottom = 55
+	watermark.offset_bottom = 78
 	hud = Hud.new()
 	hud.car = car
 	root.add_child(hud)
@@ -291,27 +295,82 @@ func _ui() -> void:
 	hint_label = _label(rows,"",13,Color("7e9eb0"))
 	hint_label.custom_minimum_size = Vector2(226,65)
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	pause_panel = PanelContainer.new()
-	pause_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	pause_panel.offset_left = -260
-	pause_panel.offset_right = 260
-	pause_panel.offset_top = -190
-	pause_panel.offset_bottom = 190
-	var pause_style := style.duplicate() as StyleBoxFlat
-	pause_style.bg_color.a = 0.94
-	pause_panel.add_theme_stylebox_override("panel",pause_style)
+	_make_pause_menu(root)
+
+func _pause_style(color: Color, border: Color, margin := 18) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(margin)
+	return style
+
+func _pause_button(parent: Node, text: String, choice: int, primary := false) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size.y = 58
+	button.add_theme_font_size_override("font_size",18 if primary else 16)
+	var background := Color("d6edf2") if primary else Color("13232d")
+	button.add_theme_color_override("font_color",Color("0c1a21") if primary else Color("d3e1e8"))
+	button.add_theme_color_override("font_hover_color",Color("0c1a21") if primary else Color.WHITE)
+	button.add_theme_color_override("font_pressed_color",Color("0c1a21") if primary else Color.WHITE)
+	button.add_theme_stylebox_override("normal",_pause_style(background,Color(0.47,0.68,0.75,0.22)))
+	button.add_theme_stylebox_override("hover",_pause_style(background.lightened(0.10),Color("8bd0df")))
+	button.add_theme_stylebox_override("pressed",_pause_style(background.darkened(0.08),Color("8bd0df")))
+	button.add_theme_stylebox_override("focus",_pause_style(Color.TRANSPARENT,Color("8bd0df"),0))
+	button.pressed.connect(_menu_action.bind(choice))
+	parent.add_child(button)
+	return button
+
+func _make_pause_menu(root: Control) -> void:
+	pause_panel = Control.new()
+	pause_panel.name = "PauseOverlay"
+	pause_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_child(pause_panel)
+	var backdrop := ColorRect.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0.004,0.012,0.020,0.76)
+	pause_panel.add_child(backdrop)
+	var card := PanelContainer.new()
+	card.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	card.offset_left = -330
+	card.offset_right = 330
+	card.offset_top = -275
+	card.offset_bottom = 275
+	card.add_theme_stylebox_override("panel",_pause_style(Color("0b1822"),Color(0.45,0.65,0.73,0.3),30))
+	pause_panel.add_child(card)
 	var menu := VBoxContainer.new()
-	menu.add_theme_constant_override("separation",14)
-	pause_panel.add_child(menu)
-	_label(menu,"试驾暂停",30,Color("ecf5f9"))
-	_label(menu,"两片区域相通，可以直接驾驶前往。",16,Color("96b4c4"))
-	for entry in [["继续驾驶",0],["回到倒挂坡道起点",1],["回到飞越车队起点",2],["退出游戏",3]]:
-		var button := Button.new()
-		button.text = entry[0]
-		button.custom_minimum_size = Vector2(460,42)
-		button.pressed.connect(_menu_action.bind(entry[1]))
-		menu.add_child(button)
+	menu.add_theme_constant_override("separation",16)
+	card.add_child(menu)
+	var eyebrow := HBoxContainer.new()
+	menu.add_child(eyebrow)
+	var tag := _label(eyebrow,"Ⅱ  PAUSED",13,Color("91d2df"))
+	tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_label(eyebrow,"ROADSTER  /  FLIGHT LAB",12,Color("607f8e"))
+	_label(menu,"试驾暂停",36,Color("e3eff4"))
+	_label(menu,"车辆已暂停，选择场景或继续试驾。",15,Color("829daa"))
+	var line := ColorRect.new()
+	line.color = Color(0.4,0.6,0.7,0.18)
+	line.custom_minimum_size.y = 1
+	menu.add_child(line)
+	var resume := _pause_button(menu,"继续驾驶                                      ESC",0,true)
+	resume.name = "ResumeDriving"
+	_label(menu,"切换试驾区域",13,Color("829daa"))
+	var scenes := HBoxContainer.new()
+	scenes.add_theme_constant_override("separation",12)
+	menu.add_child(scenes)
+	for entry in [["01   倒挂坡道\n弧形爬升 · 翻转落地",1],["02   飞越车队\n喷气弹起 · 越障横滚",2]]:
+		var button := _pause_button(scenes,entry[0],entry[1])
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size.y = 82
+	var footer := HBoxContainer.new()
+	menu.add_child(footer)
+	var note := _label(footer,"ESC 返回试驾",12,Color("607f8e"))
+	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var exit := _pause_button(footer,"退出游戏",3)
+	exit.custom_minimum_size.y = 42
+	exit.add_theme_font_size_override("font_size",14)
 	pause_panel.hide()
 
 func _menu_action(choice: int) -> void:
@@ -454,7 +513,10 @@ func _qa(delta: float) -> void:
 	elif qa_mode=="--qa-current" and not qa_busy:
 		qa_busy = true
 		_current_gallery()
-	elif qa_mode=="--qa-perf":
+	elif qa_mode in ["--qa-perf","--qa-perf-cockpit"]:
+		if qa_mode=="--qa-perf-cockpit":
+			cockpit = true
+			car.cabin.hide()
 		if elapsed>2.0:
 			perf_samples.append(delta)
 		if elapsed>14.0:
@@ -465,9 +527,10 @@ func _qa(delta: float) -> void:
 			perf_samples.sort()
 			await RenderingServer.frame_post_draw
 			var rendered := get_viewport().get_texture().get_image()
-			rendered.save_png("user://performance.png")
+			var report_name := "performance-cockpit" if cockpit else "performance"
+			rendered.save_png("user://"+report_name+".png")
 			var report := {"resolution":DisplayServer.window_get_size(),"render_resolution":rendered.get_size(),"texture_size":get_viewport().get_texture().get_size(),"frames":perf_samples.size(),"average_fps":perf_samples.size()/total,"p95_frame_ms":perf_samples[int(perf_samples.size()*0.95)]*1000.0,"renderer":RenderingServer.get_video_adapter_name()}
-			var f := FileAccess.open("user://performance.json",FileAccess.WRITE)
+			var f := FileAccess.open("user://"+report_name+".json",FileAccess.WRITE)
 			f.store_string(JSON.stringify(report,"  "))
 			print("PERFORMANCE ",JSON.stringify(report))
 			get_tree().quit()
@@ -568,12 +631,25 @@ func _current_gallery() -> void:
 	var report := {"window_mode":DisplayServer.window_get_mode(),"borderless":DisplayServer.window_get_flag(DisplayServer.WINDOW_FLAG_BORDERLESS),"screen_size":DisplayServer.screen_get_size(),"watermark":find_child("CreatorWatermark",true,false).text}
 	await _shot("current_drive")
 	qa_camera_override = true
-	camera.position = car.position+Vector3(3.3,1.5,-3.8)
+	camera.position = car.position+Vector3(3.3,0.95,-4.4)
 	camera.look_at(car.position+Vector3.UP*0.25)
 	await _shot("current_model_front")
 	camera.position = car.position+Vector3(-3.4,1.5,4.1)
 	camera.look_at(car.position+Vector3.UP*0.25)
 	await _shot("current_model_rear")
+	camera.position = car.position+Vector3(-3.0,0.78,0.05)
+	camera.look_at(car.position+Vector3(-0.3,0.43,0.15))
+	await _shot("current_side_driver")
+	var side_window := car.find_child("SideGlassLeft",true,false) as MeshInstance3D
+	report.side_window_alpha = (side_window.material_override as StandardMaterial3D).albedo_color.a
+	var pause_event := InputEventAction.new()
+	pause_event.action = "pause"
+	pause_event.pressed = true
+	_unhandled_input(pause_event)
+	await get_tree().create_timer(0.15).timeout
+	await _shot("current_pause_menu")
+	report.pause_menu_visible = pause_panel.visible and get_tree().paused
+	_menu_action(0)
 	car.request_reset(Transform3D(Basis.IDENTITY,Vector3(36,35,-70)))
 	car.test_controls = {"lift":1.0}
 	await get_tree().create_timer(0.5).timeout
@@ -618,6 +694,31 @@ func _current_gallery() -> void:
 		replay.move_camera(0.7,Vector3(1,1,0))
 		camera.look_at(replay.ghost.position)
 		await _shot("current_replay_free_camera")
+		await get_tree().create_timer(3.2).timeout
+		await _shot("current_replay_clean")
+		report.replay_idle_hides_interface = replay.ui_hidden and not replay.panel.visible and not hud.visible and not replay.status.visible
+		report.idle_keeps_watermark = find_child("CreatorWatermark",true,false).is_visible_in_tree()
+		var key := InputEventKey.new()
+		key.pressed = true
+		key.physical_keycode = KEY_SPACE
+		replay.handle_input(key)
+		report.space_toggles_playback = replay.playing
+		replay.playing = false
+		replay.seek(2.0)
+		key.physical_keycode = KEY_LEFT
+		replay.handle_input(key)
+		report.left_seeks = is_equal_approx(replay.time,1.0)
+		key.physical_keycode = KEY_RIGHT
+		replay.handle_input(key)
+		report.right_seeks = is_equal_approx(replay.time,2.0)
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		var before_pitch := camera.rotation.x
+		var motion := InputEventMouseMotion.new()
+		motion.relative = Vector2(0,20)
+		replay.handle_input(motion)
+		report.mouse_pitch_corrected = camera.rotation.x>before_pitch
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		report.input_restores_interface = not replay.ui_hidden and replay.panel.visible and hud.visible
 		report.clip_frames = replay.last_clip.size()
 		report.clip_seconds = replay.duration
 		report.live_car_drift_during_replay = car.position.distance_to(live_pose.origin)
@@ -629,7 +730,11 @@ func _current_gallery() -> void:
 	car.cabin.hide()
 	await get_tree().create_timer(0.4).timeout
 	await _shot("current_cockpit")
-	report.passed = report.window_mode==DisplayServer.WINDOW_MODE_FULLSCREEN and report.high_air_thrust==0.0 and report.high_air_jet_count==4 and not report.high_air_fog and report.replay_started and report.restored_position_error<0.001
+	car.mirror_view.get_texture().get_image().save_png("user://current_mirror_view.png")
+	report.mirror_visible_in_cockpit = car.cockpit_mirror.visible and car.mirror_view.render_target_update_mode==SubViewport.UPDATE_ALWAYS
+	report.driver_hidden_from_main_camera = camera.cull_mask & 2 == 0
+	report.mirror_camera_sees_driver = car.mirror_camera.cull_mask & 2 != 0
+	report.passed = report.window_mode==DisplayServer.WINDOW_MODE_FULLSCREEN and report.high_air_thrust==0.0 and report.high_air_jet_count==4 and not report.high_air_fog and report.replay_started and report.restored_position_error<0.001 and report.replay_idle_hides_interface and report.idle_keeps_watermark and report.input_restores_interface and report.space_toggles_playback and report.left_seeks and report.right_seeks and report.mouse_pitch_corrected and report.pause_menu_visible and report.side_window_alpha==1.0 and report.mirror_visible_in_cockpit and report.driver_hidden_from_main_camera and report.mirror_camera_sees_driver
 	var file := FileAccess.open("user://current-visual-report.json",FileAccess.WRITE)
 	file.store_string(JSON.stringify(report,"  "))
 	print("CURRENT QA ",JSON.stringify(report))

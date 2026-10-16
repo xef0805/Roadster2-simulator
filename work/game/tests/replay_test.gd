@@ -50,6 +50,40 @@ func run() -> void:
 	replay.move_camera(0.5,Vector3(1,1,-1),true)
 	check(lab.camera.position.distance_to(camera_at)>10.0,"free camera moves independently")
 	check(replay.ghost.global_transform.origin.distance_to(sample_pose.origin)<0.001,"free camera does not alter recorded pose")
+	camera_at = lab.camera.position
+	replay.move_camera(0.5,Vector3.FORWARD)
+	check(absf(lab.camera.position.distance_to(camera_at)-16.0)<0.01,"default free camera travels 32 metres per second")
+	camera_at = lab.camera.position
+	replay.move_camera(0.25,Vector3.UP)
+	check(absf(lab.camera.position.y-camera_at.y-8.0)<0.01 and absf(lab.camera.position.x-camera_at.x)<0.001,"E moves camera up in world space")
+	replay.move_camera(0.25,Vector3.DOWN)
+	check(lab.camera.position.distance_to(camera_at)<0.001,"Q moves camera down in world space")
+	var key := InputEventKey.new()
+	key.pressed = true
+	key.physical_keycode = KEY_SPACE
+	replay.handle_input(key)
+	check(replay.playing,"Space resumes replay without applying vehicle lift")
+	replay.handle_input(key)
+	check(not replay.playing,"Space pauses replay")
+	replay.seek(2.0)
+	key.physical_keycode = KEY_LEFT
+	replay.handle_input(key)
+	check(absf(replay.time-1.0)<0.001,"left arrow rewinds one second")
+	key.physical_keycode = KEY_RIGHT
+	replay.handle_input(key)
+	check(absf(replay.time-2.0)<0.001,"right arrow advances one second")
+	replay._process(3.1)
+	check(replay.ui_hidden,"idle replay hides interface")
+	var motion := InputEventMouseMotion.new()
+	motion.relative = Vector2(0,20)
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	replay.handle_input(motion)
+	check(not replay.ui_hidden,"mouse input restores interface")
+	var pitch: float = lab.camera.rotation.x
+	var yaw: float = lab.camera.rotation.y
+	replay.rotate_camera(motion.relative)
+	check(lab.camera.rotation.x>pitch and is_equal_approx(lab.camera.rotation.y,yaw),"vertical mouse drag uses corrected direction")
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	replay.seek(replay.duration+10.0)
 	check(is_equal_approx(replay.time,replay.duration),"scrubbing clamps to clip end")
 	replay.seek(-10.0)
@@ -78,6 +112,21 @@ func run() -> void:
 	lab.orbit = Vector2(PI,1.15)
 	lab._update_camera(1.0)
 	check(lab.camera.position.y>car.position.y+5.0,"expanded chase camera can look down from above")
+	car.request_reset(Transform3D(Basis.IDENTITY,Vector3(-42,0.65,22)))
+	car.test_controls = {"throttle":0.0}
+	await frames(180)
+	var ramp_start: float = replay.clock
+	car.test_controls = {"throttle":0.65}
+	var departed := false
+	for i in range(3600):
+		await physics_frame
+		if car.ramp_flip_active:
+			departed = true
+		if departed: car.test_controls = {"lift":1.0,"brake":0.5 if car.air_time>2.0 else 0.0}
+		if not replay.last_clip.is_empty() and replay.last_clip.back().t>ramp_start and replay.recording.is_empty(): break
+	var ramp_recorded: bool = not replay.last_clip.is_empty() and replay.last_clip.back().t>ramp_start
+	check(ramp_recorded and replay.last_clip.front().pose.origin.y<1.0 and replay.last_clip.front().pose.origin.z> -35.0,"ramp replay begins on flat ground before climbing",{"first_pose":replay.last_clip.front().pose.origin,"frames":replay.last_clip.size()})
+	check(ramp_recorded and replay.last_clip.any(func(f):return f.contacts>=3 and f.pose.basis.y.y< -0.15),"ramp replay retains contact ascent and overhang")
 	var file := FileAccess.open("user://replay-report.json",FileAccess.WRITE)
 	file.store_string(JSON.stringify({"passed":passed,"tests":results},"  "))
 	quit(0 if passed else 1)
