@@ -13,6 +13,9 @@ work/game/text_editor_themes/
 outputs/*
 !outputs/截图_Roadster.png
 !outputs/截图_回放.png
+!outputs/截图_飞越车队.png
+!outputs/截图_测试道路.png
+!outputs/截图_倒挂近景.png
 .vscode/
 __pycache__/
 *.tmp

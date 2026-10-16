@@ -1,67 +1,41 @@
 # Roadster2 Simulator
 
-Windows 单机自由试驾游戏。银灰色 Roadster 风格跑车、夜间测试场、倒挂弧形坡道与五车飞越场景，使用 Godot 4.7.2、GDScript、Jolt 和固定 120Hz 物理。
+驾驶银灰色 Roadster，在夜间测试场挑战倒挂道路、喷气起跳与飞越车队。支持漂移、空中翻滚、驾驶舱视角，以及带声音的自由视角回放。
 
-作者水印：**GitHub https://github.com/xef0805 / 抖音 Felix_0805**。
+**[下载 Windows 游戏](https://github.com/xef0805/Roadster2-simulator/releases/latest/download/RoadsterLab-Windows.zip)** · [全部版本](https://github.com/xef0805/Roadster2-simulator/releases) · [安全与下载说明](SECURITY.md)
 
-[![公开 Windows 构建](https://github.com/xef0805/Roadster2-simulator/actions/workflows/build.yml/badge.svg)](https://github.com/xef0805/Roadster2-simulator/actions/workflows/build.yml)
+解压后运行 `RoadsterLab/RoadsterLab.exe`，无需安装 Godot，默认无边框全屏。
 
-## 下载与运行
+![低机位观看 Roadster 飞越五车车队](outputs/截图_飞越车队.png)
 
-[下载 Windows 最新版](https://github.com/xef0805/Roadster2-simulator/releases/latest/download/RoadsterLab-Windows.zip) · [下载独立 Godot 源工程](https://github.com/xef0805/Roadster2-simulator/releases/latest/download/RoadsterLab-source.zip)
+## 两个试驾场景
 
-解压 Windows 包后双击 `RoadsterLab/RoadsterLab.exe`，默认无边框全屏，不需要安装 Godot。当前版本 **v1.0.1**，保留 v1.0.0 首版记录。
+- **倒挂道路**：从平地沿弧形坡道爬升，倒挂行驶、脱离坡顶，再翻转落地。
+- **飞越车队**：越过 Cybercab、Cybertruck、Semi、Model Y 和 Model 3，尝试喷气横滚与缓冲降落。
 
-下载前可查看 [安全、隐私与首次运行说明](SECURITY.md)。v1.0.1 起提供公开自动构建、源码提交记录、SHA-256 校验值、构建来源证明与原始扫描报告。Windows 数字签名尚未获得，SmartScreen 仍可能显示新应用提示；不要求关闭系统防护。
+夜间测试道路：
 
-银灰车身采用圆润曲面，侧面移除黑色装饰片，落地喷气保留较密白雾并将扩散范围收拢至车身附近。回放按录像状态播放行驶、轮胎、喷气及落地声，暂停同步停声。
+![从地面仰望开放式弧形道路](outputs/截图_测试道路.png)
 
-![Roadster 车身](outputs/截图_Roadster.png)
+倒挂近景：
+
+![贴着坡顶倒挂行驶的 Roadster](outputs/截图_倒挂近景.png)
+
+以上均为游戏实机截图，参考视频机位拍摄。
 
 ## 操作
 
-| 按键 | 作用 |
+| 按键 | 功能 |
 |---|---|
-| W / S | 加速 / 刹停；停稳后松开再按 S 倒车 |
-| A / D | 转向；空中调航向 |
+| W / S、A / D | 加速／制动／倒车、转向 |
 | Shift | 手刹漂移 |
-| 空格 | 近地弹起、落地缓冲；高空保留喷气动画与声音，不能持续升高 |
+| 空格 | 近地起跳、落地缓冲 |
 | Q / E | 空中左右喷气横滚 |
-| F | 开关吸附 |
-| C | 切换车外与驾驶舱 |
-| 右键拖动 / 滚轮 | 环顾 / 拉近拉远，松开后平滑归位 |
-| Tab | 查看或退出最近一次起飞、空翻回放 |
-| R / Esc | 重置 / 暂停与场景选择 |
+| F / C | 吸附开关／切换视角 |
+| 鼠标右键拖动、滚轮 | 环顾、调整距离 |
+| R / Esc | 回到起点／暂停 |
+| Tab | 查看最近一次完整动作回放 |
 
-回放保留最多 12 秒助跑记录，进入弧形坡道后持续录制整段爬升，落地约 0.8 秒后保存。回放中右键转向、WASD 自由移动、**Q/E 降低/升高、空格暂停/播放、←/→ 前后跳一秒、R 从头重播、H 隐藏/显示界面**，也可拖动进度条或点击重播、隐藏按钮。镜头默认 32m/s，Shift 加速、滚轮调整速度。默认跟随车辆，调整镜头后进入自由观察。界面不会自动隐藏，隐藏后按 H 恢复，水印保持显示。驾驶和回放的右键上下拖动均已反转。暂停时仍能移动镜头，Tab 或 Esc 返回原驾驶位置与速度。仅保留本次运行最近一次完整动作，最长约 120 秒，不是视频导出功能。
+回放中：**WASD** 移动、**Q/E** 升降、**右键** 转向、**Shift／滚轮** 调速；**空格** 暂停／播放、**←/→** 调整进度、**R** 重播、**H** 隐藏／显示界面、**Tab/Esc** 返回驾驶。
 
-车身按参考图调整楔形车头、贯穿式前灯、肩线、溜背车顶和轮毂。侧窗保持不透明；机器人仅在驾驶舱内后视镜的实时画面中可见。Esc 暂停菜单采用暗色遮罩、主按钮和场景卡片布局。
-
-![自由视角回放](outputs/截图_回放.png)
-
-## 工程与更新
-
-Godot 导入 `work/game/project.godot`，按 F5 运行。项目与发布位置固定，后续直接修改和覆盖：
-
-- `work/game/`：唯一开发源工程。
-- `outputs/RoadsterLab/`：可运行游戏与中文说明。
-- `outputs/RoadsterLab-source/`：用于交付的源工程副本。
-- `outputs/验证资料/`：最新检查报告与截图。
-- 两个发布 ZIP 始终使用 `RoadsterLab-Windows.zip`、`RoadsterLab-source.zip`。
-
-不提交 Godot 引擎、导入缓存、参考视频或大型 exe。Windows 二进制与源工程 ZIP 放在 GitHub Releases。
-
-在仓库目录运行（需要 Python；将 GODOT_BIN 指向本机 Godot 4.7.2 可执行文件）：
-
-```powershell
-$env:GODOT_BIN = 'C:\path\to\Godot_v4.7.2-stable_win64_console.exe'
-python work/run_godot.py --editor
-python work/verify.py
-python work/run_godot.py --headless --export-release 'Windows Desktop'
-python work/check_release.py
-python work/package.py
-```
-
-导出前在 Godot 中安装对应版本的 Windows 标准导出模板。检查报告写入固定的 `work/checks/`；发布前自动验证不同帧率的驾驶、弹道、回放与喷气，并检查独立 exe 全屏启动、实际画面和短时性能。
-
-车辆和机器人为自制简化模型，推力、吸附、近地范围等为游戏参数，不代表真实车辆技术规格。音效为原创合成。项目沿用仓库 MIT 许可证；Godot 与其组件声明见 `work/game/GODOT-LICENSES.txt`。
+作者：[GitHub · xef0805](https://github.com/xef0805) / 抖音 **Felix_0805**。采用 [MIT 许可证](LICENSE)。本项目为非官方模拟游戏，车辆与喷气参数用于游戏，不代表 Tesla 的真实技术规格。
