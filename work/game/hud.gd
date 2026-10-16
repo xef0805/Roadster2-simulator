@@ -85,7 +85,7 @@ func _make_attitude() -> void:
 	var model := Node3D.new()
 	attitude_car.add_child(model)
 	model.scale = Vector3.ONE*1.2
-	Art.car(model,Color("e0e7ec"))
+	Art.car(model,Color("9da3aa"))
 
 func _layout() -> void:
 	if attitude_view==null: return

@@ -132,7 +132,6 @@ func _world() -> void:
 		add_child(light)
 	_label3d("01 / OVERHANG",Vector3(-42,1.8,33),0.024)
 	_label3d("02 / FLIGHT LINE",Vector3(36,1.8,40),0.024)
-	_label3d("LANDING ZONE",Vector3(36,1,-100),0.018)
 	for x in [-42.0,36.0]:
 		for z in [24.0,27.0,30.0]:
 			Art.box(self,Vector3(8.0,0.015,0.22),Vector3(x,0.03,z),stripe)
@@ -203,11 +202,6 @@ func _build_obstacles() -> void:
 		c.shape = s
 		c.position.y = dimensions.y*0.5
 		parked.add_child(c)
-	var landing := Art.mat(Color("30ddba"),0.1,0.5,0.7)
-	for x in [-5.0,5.0]:
-		Art.box(self,Vector3(0.12,0.025,35),Vector3(36+x,0.025,-77),landing)
-	for z in [-59.5,-94.5]:
-		Art.box(self,Vector3(10,0.025,0.12),Vector3(36,0.025,z),landing)
 
 func _label3d(text: String, pos: Vector3, pixel: float) -> void:
 	var label := Label3D.new()
@@ -244,7 +238,7 @@ func _ui() -> void:
 	var title := _label(root,"ROADSTER  /  FLIGHT LAB",25,Color("e0edf3"))
 	title.name = "GameTitle"
 	title.position = Vector2(38,28)
-	var subtitle := _label(root,"自由试驾原型 v0.1.7    /    夜间测试场",15,Color("7999ad"))
+	var subtitle := _label(root,"自由试驾 v1.0.0    /    夜间测试场",15,Color("7999ad"))
 	subtitle.name = "GameSubtitle"
 	subtitle.position = Vector2(39,64)
 	var watermark := _label(root,"GitHub · https://github.com/xef0805\n抖音 · Felix_0805",14,Color(0.75,0.87,0.94,0.74))
@@ -409,7 +403,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.button_index==MOUSE_BUTTON_WHEEL_DOWN: orbit_distance = minf(24.0,orbit_distance+0.8)
 	if event is InputEventMouseMotion and orbit_held:
 		orbit.x -= event.relative.x*0.005
-		orbit.y = clampf(orbit.y-event.relative.y*0.004,-1.50,1.15)
+		orbit.y = clampf(orbit.y+event.relative.y*0.004,-1.50,1.15)
 
 func _input(event: InputEvent) -> void:
 	if testing: return
@@ -438,7 +432,7 @@ func _process(delta: float) -> void:
 	if car.position.x<0:
 		hint_label.text = "01 / 倒挂坡道\n保持吸附爬升，离开顶端后顺势翻转。空格仅近地缓冲。"
 	else:
-		hint_label.text = "02 / 飞越车队\n在车队前提前起飞。Q / E 控制横滚，绿框是落地区域。"
+		hint_label.text = "02 / 飞越车队\n在车队前提前起飞。Q / E 控制横滚，越过车队后缓冲落地。"
 	if car.position.y < -15 or absf(car.position.x)>115 or car.position.z< -260 or car.position.z>360:
 		car.request_reset(Transform3D(Basis.IDENTITY,Vector3(-42 if car.position.x<0 else 36,0.65,22)))
 	if not qa_mode.is_empty():
@@ -629,6 +623,19 @@ func _audio_sample(capture: AudioEffectCapture, inside: bool) -> Dictionary:
 func _current_gallery() -> void:
 	await get_tree().create_timer(0.8).timeout
 	var report := {"window_mode":DisplayServer.window_get_mode(),"borderless":DisplayServer.window_get_flag(DisplayServer.WINDOW_FLAG_BORDERLESS),"screen_size":DisplayServer.screen_get_size(),"watermark":find_child("CreatorWatermark",true,false).text}
+	var drag := InputEventMouseMotion.new()
+	drag.relative = Vector2(0,20)
+	orbit_held = true
+	orbit = Vector2.ZERO
+	_unhandled_input(drag)
+	report.chase_pitch_reversed = is_equal_approx(orbit.y,0.08)
+	cockpit = true
+	orbit = Vector2.ZERO
+	_unhandled_input(drag)
+	report.cockpit_pitch_reversed = is_equal_approx(orbit.y,0.08)
+	cockpit = false
+	orbit_held = false
+	orbit = Vector2.ZERO
 	await _shot("current_drive")
 	qa_camera_override = true
 	camera.position = car.position+Vector3(3.3,0.95,-4.4)
@@ -642,6 +649,9 @@ func _current_gallery() -> void:
 	await _shot("current_side_driver")
 	var side_window := car.find_child("SideGlassLeft",true,false) as MeshInstance3D
 	report.side_window_alpha = (side_window.material_override as StandardMaterial3D).albedo_color.a
+	camera.position = car.position+Vector3(-6,0.5,0)
+	camera.look_at(car.position+Vector3.UP*0.2)
+	await _shot("current_model_side")
 	var pause_event := InputEventAction.new()
 	pause_event.action = "pause"
 	pause_event.pressed = true
@@ -662,6 +672,8 @@ func _current_gallery() -> void:
 	car.test_controls = {"throttle":0.0}
 	car.request_reset(Transform3D(Basis.IDENTITY,Vector3(36,0.65,22)))
 	await get_tree().create_timer(1.2).timeout
+	car.test_controls = {"throttle":0.45}
+	await get_tree().create_timer(1.0).timeout
 	car.test_controls = {"lift":1.0}
 	await get_tree().create_timer(0.5).timeout
 	camera.position = car.position+Vector3(6,2.5,6)
@@ -679,7 +691,45 @@ func _current_gallery() -> void:
 	var live_pose := car.global_transform
 	report.replay_started = replay.start()
 	if replay.active:
+		var capture := AudioEffectCapture.new()
+		capture.buffer_length = 2.0
+		var effect_index := AudioServer.get_bus_effect_count(0)
+		AudioServer.add_bus_effect(0,capture)
+		var sound_time := 0.0
+		for frame in replay.last_clip:
+			if frame.contacts>0 and frame.velocity.length()>2.0:
+				sound_time = frame.t-replay.last_clip.front().t
+				break
+		replay.seek(sound_time)
+		await get_tree().create_timer(0.15).timeout
+		capture.clear_buffer()
+		await get_tree().create_timer(0.4).timeout
+		var samples := capture.get_buffer(capture.get_frames_available())
+		var energy := 0.0
+		var bytes := PackedByteArray()
+		bytes.resize(samples.size()*4)
+		for i in range(samples.size()):
+			energy += samples[i].length_squared()
+			bytes.encode_s16(i*4,int(clampf(samples[i].x,-1,1)*32767))
+			bytes.encode_s16(i*4+2,int(clampf(samples[i].y,-1,1)*32767))
+		report.replay_audio_rms = sqrt(energy/maxi(1,samples.size()*2))
+		var wav := AudioStreamWAV.new()
+		wav.format = AudioStreamWAV.FORMAT_16_BITS
+		wav.stereo = true
+		wav.mix_rate = int(AudioServer.get_mix_rate())
+		wav.data = bytes
+		wav.save_to_wav("user://current_replay_audio.wav")
 		replay.playing = false
+		await get_tree().create_timer(0.15).timeout
+		capture.clear_buffer()
+		await get_tree().create_timer(0.2).timeout
+		samples = capture.get_buffer(capture.get_frames_available())
+		energy = 0.0
+		for sample in samples: energy += sample.length_squared()
+		report.replay_paused_audio_rms = sqrt(energy/maxi(1,samples.size()*2))
+		report.replay_pauses_audio = replay.ghost.motor_audio.stream_paused and replay.ghost.jet_audio.stream_paused and report.replay_paused_audio_rms<0.000001
+		report.live_audio_paused = car.motor_audio.stream_paused and car.jet_audio.stream_paused
+		AudioServer.remove_bus_effect(0,effect_index)
 		var peak_time := 0.0
 		var max_y := 0.0
 		for frame in replay.last_clip:
@@ -695,9 +745,11 @@ func _current_gallery() -> void:
 		camera.look_at(replay.ghost.position)
 		await _shot("current_replay_free_camera")
 		await get_tree().create_timer(3.2).timeout
+		report.replay_idle_keeps_interface = not replay.ui_hidden and replay.panel.visible and hud.visible
+		replay._button(5)
 		await _shot("current_replay_clean")
-		report.replay_idle_hides_interface = replay.ui_hidden and not replay.panel.visible and not hud.visible and not replay.status.visible
-		report.idle_keeps_watermark = find_child("CreatorWatermark",true,false).is_visible_in_tree()
+		report.manual_hide_interface = replay.ui_hidden and not replay.panel.visible and not hud.visible and not replay.status.visible
+		report.hidden_keeps_watermark = find_child("CreatorWatermark",true,false).is_visible_in_tree()
 		var key := InputEventKey.new()
 		key.pressed = true
 		key.physical_keycode = KEY_SPACE
@@ -716,14 +768,42 @@ func _current_gallery() -> void:
 		var motion := InputEventMouseMotion.new()
 		motion.relative = Vector2(0,20)
 		replay.handle_input(motion)
-		report.mouse_pitch_corrected = camera.rotation.x>before_pitch
+		report.mouse_pitch_reversed = camera.rotation.x<before_pitch
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		report.input_restores_interface = not replay.ui_hidden and replay.panel.visible and hud.visible
+		report.input_keeps_interface_hidden = replay.ui_hidden and not replay.panel.visible
+		key.physical_keycode = KEY_H
+		replay.handle_input(key)
+		report.h_restores_interface = not replay.ui_hidden and replay.panel.visible and hud.visible
+		key.physical_keycode = KEY_R
+		replay.handle_input(key)
+		report.restart_from_beginning = replay.time==0.0 and replay.playing
+		replay.seek(peak_time)
+		replay.playing = false
+		await _shot("current_replay_controls")
 		report.clip_frames = replay.last_clip.size()
 		report.clip_seconds = replay.duration
 		report.live_car_drift_during_replay = car.position.distance_to(live_pose.origin)
 		replay.stop()
 		report.restored_position_error = car.position.distance_to(live_pose.origin)
+	car.test_controls = {"lift":1.0}
+	car.request_reset(Transform3D(Basis.IDENTITY,Vector3(75,14,45)))
+	await get_tree().create_timer(0.2).timeout
+	for i in range(600):
+		await get_tree().physics_frame
+		if car.position.y<2.0 and car.linear_velocity.y< -0.5: break
+	camera.position = car.position+Vector3(7,2.0,6)
+	camera.look_at(car.position)
+	await _shot("current_landing_plume")
+	report.landing_downwash = car.downwash_strength
+	report.landing_fog_emitting = car.dust.emitting
+	report.landing_fog_ratio = car.dust.amount_ratio
+	for i in range(600):
+		await get_tree().physics_frame
+		if car.wheel_contacts>=3: break
+	await get_tree().create_timer(0.2).timeout
+	camera.position = car.position+Vector3(7,2.0,6)
+	camera.look_at(car.position)
+	await _shot("current_landing_cloud")
 	qa_camera_override = false
 	car.test_controls = {"throttle":0.0}
 	cockpit = true
@@ -734,7 +814,7 @@ func _current_gallery() -> void:
 	report.mirror_visible_in_cockpit = car.cockpit_mirror.visible and car.mirror_view.render_target_update_mode==SubViewport.UPDATE_ALWAYS
 	report.driver_hidden_from_main_camera = camera.cull_mask & 2 == 0
 	report.mirror_camera_sees_driver = car.mirror_camera.cull_mask & 2 != 0
-	report.passed = report.window_mode==DisplayServer.WINDOW_MODE_FULLSCREEN and report.high_air_thrust==0.0 and report.high_air_jet_count==4 and not report.high_air_fog and report.replay_started and report.restored_position_error<0.001 and report.replay_idle_hides_interface and report.idle_keeps_watermark and report.input_restores_interface and report.space_toggles_playback and report.left_seeks and report.right_seeks and report.mouse_pitch_corrected and report.pause_menu_visible and report.side_window_alpha==1.0 and report.mirror_visible_in_cockpit and report.driver_hidden_from_main_camera and report.mirror_camera_sees_driver
+	report.passed = report.window_mode==DisplayServer.WINDOW_MODE_FULLSCREEN and report.high_air_thrust==0.0 and report.high_air_jet_count==4 and not report.high_air_fog and report.replay_started and report.restored_position_error<0.001 and report.replay_idle_keeps_interface and report.manual_hide_interface and report.hidden_keeps_watermark and report.input_keeps_interface_hidden and report.h_restores_interface and report.restart_from_beginning and report.space_toggles_playback and report.left_seeks and report.right_seeks and report.mouse_pitch_reversed and report.chase_pitch_reversed and report.cockpit_pitch_reversed and report.pause_menu_visible and report.side_window_alpha==1.0 and report.mirror_visible_in_cockpit and report.driver_hidden_from_main_camera and report.mirror_camera_sees_driver and report.replay_audio_rms>0.00001 and report.replay_pauses_audio and report.live_audio_paused and report.landing_fog_emitting and report.landing_fog_ratio>0.2
 	var file := FileAccess.open("user://current-visual-report.json",FileAccess.WRITE)
 	file.store_string(JSON.stringify(report,"  "))
 	print("CURRENT QA ",JSON.stringify(report))

@@ -40,6 +40,7 @@ func run() -> void:
 	car.linear_velocity = Vector3(2,0,-3)
 	var velocity: Vector3 = car.linear_velocity
 	check(replay.start(),"starts completed replay")
+	check(not replay.ghost.audio_muted,"replay vehicle enables recorded-state car audio")
 	replay.playing = false
 	replay.seek(replay.duration*0.45)
 	var sample_pose: Transform3D = replay.ghost.global_transform
@@ -73,23 +74,73 @@ func run() -> void:
 	replay.handle_input(key)
 	check(absf(replay.time-2.0)<0.001,"right arrow advances one second")
 	replay._process(3.1)
-	check(replay.ui_hidden,"idle replay hides interface")
+	check(not replay.ui_hidden,"idle replay keeps interface visible")
+	key.physical_keycode = KEY_H
+	replay.handle_input(key)
+	check(replay.ui_hidden,"H hides replay interface")
 	var motion := InputEventMouseMotion.new()
 	motion.relative = Vector2(0,20)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	replay.handle_input(motion)
-	check(not replay.ui_hidden,"mouse input restores interface")
+	check(replay.ui_hidden,"mouse input preserves manual interface hiding")
 	var pitch: float = lab.camera.rotation.x
 	var yaw: float = lab.camera.rotation.y
 	replay.rotate_camera(motion.relative)
-	check(lab.camera.rotation.x>pitch and is_equal_approx(lab.camera.rotation.y,yaw),"vertical mouse drag uses corrected direction")
+	check(lab.camera.rotation.x<pitch and is_equal_approx(lab.camera.rotation.y,yaw),"replay vertical mouse drag reverses previous direction")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	key.physical_keycode = KEY_RIGHT
+	replay.handle_input(key)
+	replay.move_camera(0.1,Vector3.UP)
+	replay._process(4.0)
+	check(replay.ui_hidden,"seeking movement and idle preserve hidden interface")
+	key.physical_keycode = KEY_H
+	replay.handle_input(key)
+	check(not replay.ui_hidden,"H restores replay interface")
+	var free_camera: Transform3D = lab.camera.global_transform
+	key.physical_keycode = KEY_R
+	replay.handle_input(key)
+	check(replay.time==0.0 and replay.playing and replay.ghost.position.distance_to(replay.last_clip.front().pose.origin)<0.001,"R restarts playback from first frame")
+	check(lab.camera.global_transform.is_equal_approx(free_camera) and car.freeze and car.position.distance_to(before.origin)<0.001,"restart preserves free camera and frozen live car")
+	replay.seek(2.0)
+	replay.playing = false
+	replay._button(4)
+	check(replay.time==0.0 and replay.playing,"replay restart button starts from beginning")
+	replay._button(5)
+	check(replay.ui_hidden,"hide button hides interface")
+	var landing_index := -1
+	for i in range(1,replay.last_clip.size()-1):
+		if replay.last_clip[i-1].contacts==0 and replay.last_clip[i].contacts>0 and replay.last_clip[i].landing>1.5:
+			landing_index = i
+			break
+	check(landing_index>0,"recording retains landing sound strength")
+	if landing_index>0:
+		replay.seek(replay.last_clip[landing_index-1].t-replay.last_clip.front().t+0.001)
+		replay.time = replay.last_clip[landing_index].t-replay.last_clip.front().t+0.001
+		replay.apply_frame()
+		check(replay.ghost.pending_impact and replay.ghost.impact_speed>1.5,"continuous playback triggers recorded landing once")
+		replay.playing = false
+		replay.seek(replay.time)
+		check(not replay.ghost.pending_impact,"scrubbing does not trigger a landing sound")
+	car.tire_slip = 4.2
+	check(is_equal_approx(replay.snapshot().slip,4.2),"recording retains tire slip for replay sound")
+	car.tire_slip = 0.0
 	replay.seek(replay.duration+10.0)
 	check(is_equal_approx(replay.time,replay.duration),"scrubbing clamps to clip end")
 	replay.seek(-10.0)
 	check(replay.time==0.0,"scrubbing clamps to clip start")
 	replay.stop()
+	check(not replay.ui_hidden,"exit restores interface visibility")
 	check(not car.freeze and car.visible and car.linear_velocity.distance_to(velocity)<0.001 and car.global_position.distance_to(before.origin)<0.001,"exit restores live pose and velocity")
+	lab.testing = false
+	lab.orbit_held = true
+	for inside in [false,true]:
+		lab.cockpit = inside
+		lab.orbit = Vector2.ZERO
+		lab._unhandled_input(motion)
+		check(is_equal_approx(lab.orbit.y,0.08) and lab.orbit.x==0.0,"driving vertical drag reversed in "+("cockpit" if inside else "chase"))
+	lab.testing = true
+	lab.cockpit = false
+	lab.orbit_held = false
 	var original_size: int = replay.last_clip.size()
 	car.test_controls = {"throttle":0.0}
 	car.request_reset(Transform3D(Basis.IDENTITY,Vector3(75,60,45)))

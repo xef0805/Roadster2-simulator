@@ -98,7 +98,7 @@ func _ready() -> void:
 	col.position.y = 0.04
 	add_child(col)
 	if visual_enabled:
-		var visual := Art.car(self,Color("e6edf1"),true)
+		var visual := Art.car(self,Color("9da3aa"),true)
 		wheel_visuals = visual.wheels
 		cabin = visual.cabin
 		driver = visual.driver
@@ -354,6 +354,7 @@ func nozzle_visual_force(index: int) -> Vector3:
 func _process(delta: float) -> void:
 	if not visual_enabled:
 		return
+	var landing_plume := wheel_contacts==0 and linear_velocity.y< -0.5 and vertical_thrust>100.0
 	if not driver.is_empty():
 		driver.head.visible = true
 		var turn := Basis(Vector3(0,cos(PI/2.5),sin(PI/2.5)),-float(controls.steer)*0.55)
@@ -379,15 +380,18 @@ func _process(delta: float) -> void:
 		var force := nozzle_visual_force(i)
 		var strength := force.length()/(LIFT/4.0)
 		jet.emitting = strength>0.025
-		jet.amount_ratio = clampf(strength,0.05,1.0)
+		jet.amount_ratio = clampf(strength*(1.6 if landing_plume else 1.0),0.05,1.0)
 		jet_cores[i].visible = jet.emitting
 		if force.length()>1.0:
 			jet.global_basis = Basis(Quaternion(Vector3.UP,-force.normalized()))
 		var plume_length := 0.6+minf(strength,1.2)*2.4
-		jet_cores[i].scale = Vector3.ONE*0.7+Vector3(0.3,0,0.3)*minf(strength,1.0)
+		jet_cores[i].scale = (Vector3.ONE*0.7+Vector3(0.3,0,0.3)*minf(strength,1.0))*(1.6 if landing_plume else 1.0)
 		jet_cores[i].scale.y = plume_length
 		jet_cores[i].position.y = plume_length*0.5
 		var pmat := jet.process_material as ParticleProcessMaterial
+		pmat.scale_min = 0.42 if landing_plume else 0.18
+		pmat.scale_max = 0.85 if landing_plume else 0.35
+		pmat.spread = 15.0 if landing_plume else 8.0
 		pmat.initial_velocity_min = 12.0+strength*4.0
 		pmat.initial_velocity_max = 18.0+strength*6.0
 	for i in range(roll_jet_nodes.size()):
@@ -428,15 +432,15 @@ func _process(delta: float) -> void:
 		var normal := wash_normal.normalized()
 		dust.global_transform = Transform3D(Basis(Quaternion(Vector3.UP,normal)),wash_position/downwash_strength+normal*0.18)
 	dust.emitting = downwash_strength>0.025
-	dust.amount_ratio = clampf(downwash_strength,0.0,1.0)
+	dust.amount_ratio = clampf(downwash_strength*(3.5 if landing_plume else 1.8),0.0,1.0)
 	if pending_impact:
 		if dust_cooldown==0.0 and not ground.is_empty():
 			var strength := clampf(impact_speed/12.0,0.25,1.0)
 			landing_dust.global_transform = Transform3D(Basis(Quaternion(Vector3.UP,ground.normal)),ground.position+ground.normal*0.18)
-			landing_dust.amount_ratio = strength
+			landing_dust.amount_ratio = maxf(0.55,strength)
 			var smoke := landing_dust.process_material as ParticleProcessMaterial
-			smoke.radial_velocity_min = 2.0+strength*1.5
-			smoke.radial_velocity_max = 4.0+strength*4.0
+			smoke.radial_velocity_min = 1.5+strength
+			smoke.radial_velocity_max = 3.0+strength*2.0
 			landing_dust.restart()
 			dust_cooldown = 0.8
 		impact_audio.volume_db = clampf(-24.0+impact_speed*1.4,-24.0,-5.0)+audio_view_gain
@@ -548,7 +552,7 @@ func _make_effects() -> void:
 			image.set_pixel(x,y,Color(1,1,1,pow(maxf(0.0,1.0-radius),2.0)))
 	var texture := ImageTexture.create_from_image(image)
 	for p in MOUNTS:
-		var jet := _particle(96,0.18,0.35,Color(0.5,0.82,1.0,0.22))
+		var jet := _particle(220,0.24,0.35,Color(0.78,0.9,1.0,0.32))
 		jet.fixed_fps = 120
 		add_child(jet)
 		jet.position = Vector3(p.x,-0.05,p.z)
@@ -619,11 +623,11 @@ void fragment() {
 			var alpha := smoothstep(1.0,0.25,radius+cloud*0.24)*lerpf(0.25,1.0,cloud)
 			smoke_image.set_pixel(x,y,Color(0.65+cloud*0.35,0.68+cloud*0.32,0.72+cloud*0.28,alpha))
 	var smoke_texture := ImageTexture.create_from_image(smoke_image)
-	dust = _particle(1900,1.8,6.0,Color(0.86,0.90,0.94,0.42))
+	dust = _particle(2200,1.35,3.2,Color(0.92,0.95,0.98,0.55))
 	dust.fixed_fps = 60
 	add_child(dust)
 	dust.top_level = true
-	landing_dust = _particle(480,2.6,3.1,Color(0.69,0.74,0.78,0.24))
+	landing_dust = _particle(900,1.6,2.6,Color(0.9,0.93,0.97,0.48))
 	add_child(landing_dust)
 	landing_dust.top_level = true
 	landing_dust.one_shot = true
@@ -656,31 +660,31 @@ void fragment() {
 		var scale_texture := CurveTexture.new()
 		scale_texture.curve = growth
 		dm.scale_curve = scale_texture
-		var color := Color(0.69,0.74,0.78)
+		var color := Color(0.9,0.93,0.97)
 		var fade := Gradient.new()
 		fade.offsets = PackedFloat32Array([0,0.08,0.35,1])
-		fade.colors = PackedColorArray([Color(color,0),Color(color,0.24),Color(color,0.16),Color(color,0)])
+		fade.colors = PackedColorArray([Color(color,0),Color(color,0.48),Color(color,0.30),Color(color,0)])
 		(dm.color_ramp as GradientTexture1D).gradient = fade
 		(emitter.draw_pass_1.material as StandardMaterial3D).albedo_texture = smoke_texture
 	var wash := dust.process_material as ParticleProcessMaterial
-	wash.scale_min = 3.8
-	wash.scale_max = 6.0
-	wash.initial_velocity_min = 1.0
-	wash.initial_velocity_max = 2.4
-	wash.radial_velocity_min = 4.0
-	wash.radial_velocity_max = 9.0
-	wash.emission_ring_radius = 2.0
-	wash.emission_ring_inner_radius = 1.0
+	wash.scale_min = 1.9
+	wash.scale_max = 3.2
+	wash.initial_velocity_min = 0.4
+	wash.initial_velocity_max = 1.1
+	wash.radial_velocity_min = 1.6
+	wash.radial_velocity_max = 3.2
+	wash.emission_ring_radius = 1.4
+	wash.emission_ring_inner_radius = 0.7
 	wash.color_ramp = wash.color_ramp.duplicate(true)
 	var wash_growth := Curve.new()
 	wash_growth.add_point(Vector2(0,0.65))
 	wash_growth.add_point(Vector2(0.35,1.0))
-	wash_growth.add_point(Vector2(1,1.5))
+	wash_growth.add_point(Vector2(1,1.15))
 	var wash_scale := CurveTexture.new()
 	wash_scale.curve = wash_growth
 	wash.scale_curve = wash_scale
 	var wash_fade := (wash.color_ramp as GradientTexture1D).gradient
-	wash_fade.colors = PackedColorArray([Color(0.86,0.90,0.94,0),Color(0.86,0.90,0.94,0.42),Color(0.86,0.90,0.94,0.32),Color(0.86,0.90,0.94,0)])
+	wash_fade.colors = PackedColorArray([Color(0.92,0.95,0.98,0),Color(0.92,0.95,0.98,0.55),Color(0.92,0.95,0.98,0.38),Color(0.92,0.95,0.98,0)])
 	for i in range(2):
 		var smoke := _particle(400,1.4,2.2,Color(0.69,0.74,0.78,0.18))
 		smoke.fixed_fps = 120
