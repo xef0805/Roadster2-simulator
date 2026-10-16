@@ -1,0 +1,61 @@
+name: Verified Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Use Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Download and verify official Godot 4.7.2
+        run: python build/release.py setup
+      - name: Import project
+        run: python work/run_godot.py --headless --editor --import --quit
+      - name: Test physics and replay at 30, 60 and 120 FPS
+        run: python work/verify.py
+      - name: Export Windows executable
+        run: python work/run_godot.py --headless --export-release "Windows Desktop"
+      - name: Launch independent executable
+        run: python build/release.py smoke
+      - name: Package source, executable and checksums
+        run: python build/release.py package
+      - name: Record Microsoft Defender scan
+        shell: pwsh
+        run: ./build/defender_scan.ps1 -Files outputs/RoadsterLab/RoadsterLab.exe,outputs/RoadsterLab-Windows.zip,outputs/RoadsterLab-source.zip -Report outputs/Defender-report.json
+      - name: Attest the executable and release archives
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            outputs/RoadsterLab/RoadsterLab.exe
+            outputs/RoadsterLab-Windows.zip
+            outputs/RoadsterLab-source.zip
+      - name: Upload verified release files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: RoadsterLab-verified
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            outputs/RoadsterLab-Windows.zip
+            outputs/RoadsterLab-source.zip
+            outputs/SHA256SUMS.txt
+            outputs/Build-info.json
+            outputs/Defender-report.json
+            outputs/自动测试结果.zip

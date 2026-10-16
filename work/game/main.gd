@@ -238,7 +238,7 @@ func _ui() -> void:
 	var title := _label(root,"ROADSTER  /  FLIGHT LAB",25,Color("e0edf3"))
 	title.name = "GameTitle"
 	title.position = Vector2(38,28)
-	var subtitle := _label(root,"自由试驾 v1.0.0    /    夜间测试场",15,Color("7999ad"))
+	var subtitle := _label(root,"自由试驾 v1.0.1    /    夜间测试场",15,Color("7999ad"))
 	subtitle.name = "GameSubtitle"
 	subtitle.position = Vector2(39,64)
 	var watermark := _label(root,"GitHub · https://github.com/xef0805\n抖音 · Felix_0805",14,Color(0.75,0.87,0.94,0.74))

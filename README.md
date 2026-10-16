@@ -4,11 +4,15 @@ Windows 单机自由试驾游戏。银灰色 Roadster 风格跑车、夜间测�
 
 作者水印：**GitHub https://github.com/xef0805 / 抖音 Felix_0805**。
 
+[![公开 Windows 构建](https://github.com/xef0805/Roadster2-simulator/actions/workflows/build.yml/badge.svg)](https://github.com/xef0805/Roadster2-simulator/actions/workflows/build.yml)
+
 ## 下载与运行
 
 [下载 Windows 最新版](https://github.com/xef0805/Roadster2-simulator/releases/latest/download/RoadsterLab-Windows.zip) · [下载独立 Godot 源工程](https://github.com/xef0805/Roadster2-simulator/releases/latest/download/RoadsterLab-source.zip)
 
-解压 Windows 包后双击 `RoadsterLab/RoadsterLab.exe`，默认无边框全屏，不需要安装 Godot。首个正式版本 **v1.0.0**，见 [GitHub Releases](https://github.com/xef0805/Roadster2-simulator/releases/tag/v1.0.0)。
+解压 Windows 包后双击 `RoadsterLab/RoadsterLab.exe`，默认无边框全屏，不需要安装 Godot。当前版本 **v1.0.1**，保留 v1.0.0 首版记录。
+
+下载前可查看 [安全、隐私与首次运行说明](SECURITY.md)。v1.0.1 起提供公开自动构建、源码提交记录、SHA-256 校验值、构建来源证明与原始扫描报告。Windows 数字签名尚未获得，SmartScreen 仍可能显示新应用提示；不要求关闭系统防护。
 
 银灰车身采用圆润曲面，侧面移除黑色装饰片，落地喷气保留较密白雾并将扩散范围收拢至车身附近。回放按录像状态播放行驶、轮胎、喷气及落地声，暂停同步停声。
 
