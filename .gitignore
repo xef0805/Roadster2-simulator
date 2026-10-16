@@ -1,0 +1,18 @@
+# Source and fixed build helpers only; exclude engines, videos and local caches.
+work/*
+!work/game/
+!work/run_godot.py
+!work/verify.py
+!work/check_release.py
+!work/package.py
+work/game/.godot/
+work/game/export_templates/
+work/game/feature_profiles/
+work/game/script_templates/
+work/game/text_editor_themes/
+outputs/*
+!outputs/截图_Roadster.png
+!outputs/截图_回放.png
+.vscode/
+__pycache__/
+*.tmp
